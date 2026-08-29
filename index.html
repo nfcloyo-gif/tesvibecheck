@@ -9,14 +9,113 @@
   <meta name="theme-color" content="#3b82f6">
   <meta name="description" content="Aplikasi offline cerdas untuk jadwal dan jurnal harian">
   
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  
   <!-- CDN Libraries -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-  <!-- Panggilan ke file CSS eksternal -->
-  <link rel="stylesheet" href="style.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Poppins:wght@600;700;800&display=swap');
+    
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+
+    /* Custom Checkbox (Untuk Task UI) */
+    .task-cb { 
+      appearance: none; -webkit-appearance: none; 
+      width: 26px; height: 26px; border-radius: 50%; 
+      border: 2px solid #4b5563; cursor: pointer; 
+      transition: all 0.2s ease-in-out; position: relative; outline: none; background: transparent; flex-shrink: 0; 
+    }
+    .task-cb:checked { border-color: #10b981; background-color: rgba(16, 185, 129, 0.1); }
+    .task-cb:checked::after { 
+      content: ''; position: absolute; left: 8px; top: 3px; width: 6px; height: 12px; 
+      border: solid #10b981; border-width: 0 2px 2px 0; transform: rotate(45deg); 
+    }
+
+    /* OVERLAYS / MODALS FIXED POSITIONING FIX */
+    .overlay-window { 
+      position: fixed !important; 
+      top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+      display: flex; align-items: center; justify-content: center; 
+      z-index: 99999 !important; 
+      animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+    }
+    .overlay-backdrop { 
+      position: absolute; inset: 0; 
+      background: rgba(3, 7, 18, 0.85); backdrop-filter: blur(10px); 
+      z-index: -1; 
+    }
+    @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    
+    .tab-content { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Glassmorphism Utilities */
+    .glass-card { background: rgba(31, 41, 55, 0.4); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1); }
+    
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
+
+    /* ========================================================
+       STYLE KHUSUS KALENDER TAHUNAN & EVENT OVERLAY
+       ======================================================== */
+    #calendar-overlay { 
+      display: none; position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; 
+      z-index: 90000 !important; 
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); 
+      overflow-y: auto; overflow-x: hidden; 
+    }
+    #calendar-overlay::before { 
+      content: ''; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+      background: radial-gradient(circle at 20% 50%, rgba(102, 126, 234, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(245, 87, 108, 0.1) 0%, transparent 50%); 
+      pointer-events: none; z-index: 0; animation: gradientShift 8s ease-in-out infinite; 
+    }
+    @keyframes gradientShift { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
+    
+    .cal-container { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 40px 20px; }
+    .cal-header h1 { font-family: 'Poppins', sans-serif; font-size: 2.2rem; font-weight: 800; background: linear-gradient(135deg, #667eea, #f5576c, #00f2fe); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 10px; letter-spacing: -1px; text-align: center; line-height: 1.2; }
+    @media (min-width: 768px) { .cal-header h1 { font-size: 3.5rem; } }
+    
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    @media (min-width: 768px) { .cal-grid { gap: 12px; } }
+    
+    .day-cell { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 4px; cursor: pointer; transition: all 0.3s ease; position: relative; display: flex; flex-direction: column; overflow: hidden; min-height: 60px; }
+    @media (min-width: 768px) { .day-cell { padding: 10px; border-radius: 12px; min-height: 100px; } }
+    
+    .day-cell:hover { background: rgba(102, 126, 234, 0.2); border-color: #667eea; transform: translateY(-5px); box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2); }
+    .day-cell.other-month { opacity: 0.3; cursor: default; }
+    .day-cell.other-month:hover { background: rgba(255, 255, 255, 0.05); transform: none; box-shadow: none; }
+    .day-cell.today { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-color: transparent; font-weight: 700; }
+    
+    .day-number { font-weight: 600; font-size: 0.9rem; margin-bottom: 4px; color: #fff; text-align: center; }
+    @media (min-width: 768px) { .day-number { font-size: 1.1rem; margin-bottom: 8px; text-align: left; } }
+    
+    .quest-dots { display: flex; gap: 4px; justify-content: center; margin-bottom: 4px; flex-wrap: wrap; }
+    .quest-dot { width: 6px; height: 6px; border-radius: 50%; background-color: #10b981; box-shadow: 0 0 5px #10b981; }
+    
+    .event-badges { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto; }
+    @media (min-width: 768px) { .event-badges { gap: 4px; } }
+    
+    .event-badge { padding: 2px 4px; border-radius: 4px; font-size: 0.6rem; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; text-align: center; line-height: 1.2; }
+    @media (min-width: 768px) { .event-badge { padding: 4px 8px; border-radius: 6px; font-size: 0.7rem; text-align: left; } }
+    
+    .ev-custom { background: linear-gradient(135deg, #3b82f6, #fee140); color: #000; }
+    .ev-nasional { background: linear-gradient(135deg, #4facfe, #00f2fe); color: #000; }
+    .ev-festival { background: linear-gradient(135deg, #f093fb, #f5576c); color: #fff; }
+    .ev-liburan { background: linear-gradient(135deg, #43e97b, #38f9d7); color: #000; }
+
+    /* Custom File Input */
+    .file-input-wrapper input[type="file"] { position: absolute; left: -9999px; }
+    .file-input-label { display: block; padding: 12px 16px; background: rgba(102, 126, 234, 0.15); border: 2px dashed rgba(102, 126, 234, 0.4); border-radius: 10px; cursor: pointer; transition: all 0.3s ease; text-align: center; color: #e0e7ff; font-weight: 600; }
+    .file-input-label:hover { background: rgba(102, 126, 234, 0.25); border-color: #667eea; }
+  </style>
 </head>
 <body class="min-h-screen bg-[#09090b] text-gray-100 pb-24 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/20 via-[#09090b] to-[#09090b]">
   
@@ -101,7 +200,7 @@
         </div>
       </div>
 
-      <!-- Form Tambah Tugas -->
+      <!-- Form Tambah Tugas Terpadu -->
       <div class="glass-card rounded-3xl p-1 mb-10 bg-gradient-to-b from-white/10 to-transparent p-[1px]">
         <div class="bg-[#0f1117] rounded-[23px] p-6 sm:p-8">
           <div class="flex items-center gap-3 mb-2">
@@ -120,7 +219,7 @@
                 <option value="Personal">✨ Personal</option>
               </select>
             </div>
-            
+
             <button onclick="saveNewTask()" class="w-full bg-gradient-to-r from-blue-600 to-violet-600 text-white px-8 py-4 rounded-2xl hover:from-blue-500 hover:to-violet-500 hover:-translate-y-1 active:scale-[0.98] font-black text-lg transition-all flex justify-center items-center gap-2 shadow-[0_10px_20px_-10px_rgba(59,130,246,0.5)] mt-4">
               <i data-lucide="zap" class="w-5 h-5 fill-white"></i> SIMPAN TUGAS
             </button>
@@ -131,7 +230,7 @@
       <!-- Task List Container -->
       <div id="task-list-container" class="space-y-3"></div>
 
-      <!-- TEMPAT BANNER EVENT MUNCUL OTOMATIS -->
+      <!-- TEMPAT BANNER EVENT MUNCUL OTOMATIS (Di Bawah Tugas) -->
       <div id="daily-event-banner" class="mt-6" style="display: none;"></div>
     </div>
 
@@ -166,6 +265,7 @@
       </div>
 
       <div class="max-w-3xl mx-auto space-y-8">
+        <!-- Blok Pagi -->
         <div class="glass-card rounded-[32px] p-8 border border-white/5 relative overflow-hidden">
           <div class="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 rounded-full blur-[80px]"></div>
           
@@ -195,6 +295,7 @@
           </div>
         </div>
 
+        <!-- Blok Malam -->
         <div class="glass-card rounded-[32px] p-8 border border-white/5 relative overflow-hidden">
           <div class="absolute bottom-0 left-0 w-64 h-64 bg-violet-600/10 rounded-full blur-[80px]"></div>
           
@@ -237,6 +338,7 @@
           </div>
         </div>
 
+        <!-- Blok Foto Jurnal -->
         <div class="glass-card rounded-[32px] p-8 border border-white/5 relative overflow-hidden text-center">
           <div class="flex items-center justify-center gap-3 mb-4 relative z-10">
             <div class="p-3 bg-blue-500/20 rounded-2xl"><i data-lucide="camera" class="w-6 h-6 text-blue-400"></i></div>
@@ -294,6 +396,7 @@
           </div>
         </div>
 
+        <!-- Chart 30 Hari -->
         <div class="bg-[#151923] rounded-[24px] p-6 border border-white/5 shadow-lg transition-all">
           <p class="text-gray-300 text-[11px] font-black tracking-widest uppercase mb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-1">
             Matriks Konsistensi - 30 Hari 
@@ -302,6 +405,7 @@
           <div class="w-full h-48"><canvas id="consistencyChart"></canvas></div>
         </div>
 
+        <!-- Chart 12 Bulan -->
         <div class="bg-[#151923] rounded-[24px] p-6 border border-white/5 shadow-lg transition-all mt-4">
           <p class="text-gray-300 text-[11px] font-black tracking-widest uppercase mb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-1">
             Rata-Rata Per Bulan - Tahun Ini 
@@ -316,25 +420,25 @@
   </div>
 
   <!-- ========================================================= -->
-  <!-- OVERLAY KALENDER TAHUNAN & MANAJEMEN EVENT                -->
+  <!-- OVERLAY KALENDER TAHUNAN & MANAJEMEN EVENT (FULL SCREEN)  -->
   <!-- ========================================================= -->
   <div id="calendar-overlay" class="overlay-window hidden" style="display: none;">
     <div class="cal-container pb-32 w-full h-full">
       <!-- Header Kalender -->
       <div class="cal-header mb-8 flex items-center justify-between mt-10">
-        <button type="button" onclick="closeCalendarModal()" class="bg-white/10 hover:bg-red-500/80 text-white p-3 rounded-full backdrop-blur-md transition-all active:scale-90 shadow-lg flex items-center gap-2 z-50">
+        <button onclick="closeCalendarModal()" class="bg-white/10 hover:bg-red-500/80 text-white p-3 rounded-full backdrop-blur-md transition-all active:scale-90 shadow-lg flex items-center gap-2 z-50">
           <i data-lucide="x" class="w-6 h-6"></i>
         </button>
         <h1 class="flex-1 text-center pr-10">🗓️ Manajemen Event</h1>
       </div>
 
-      <!-- Controls Navigasi Bulan -->
+      <!-- Controls Navigasi Kalender -->
       <div class="flex justify-between items-center mb-8 bg-white/5 p-4 rounded-2xl backdrop-blur-md border border-white/10">
-        <button type="button" onclick="calPrevMonth()" class="bg-black/30 hover:bg-blue-500/20 text-white p-3 rounded-xl font-bold transition border border-white/10">
+        <button onclick="calPrevMonth()" class="bg-black/30 hover:bg-blue-500/20 text-white p-3 rounded-xl font-bold transition border border-white/10">
           <i data-lucide="chevron-left" class="w-6 h-6"></i>
         </button>
         <div class="font-black text-xl sm:text-2xl text-white tracking-widest uppercase text-center" id="cal-month-year"></div>
-        <button type="button" onclick="calNextMonth()" class="bg-black/30 hover:bg-blue-500/20 text-white p-3 rounded-xl font-bold transition border border-white/10">
+        <button onclick="calNextMonth()" class="bg-black/30 hover:bg-blue-500/20 text-white p-3 rounded-xl font-bold transition border border-white/10">
           <i data-lucide="chevron-right" class="w-6 h-6"></i>
         </button>
       </div>
@@ -350,25 +454,24 @@
           <div class="text-gray-400 font-bold text-xs md:text-sm uppercase">Jum</div>
           <div class="text-cyan-400 font-black text-xs md:text-sm uppercase">Sab</div>
         </div>
-        <!-- Wadah Grid Kalender -->
         <div class="cal-grid" id="calendar-grid"></div>
       </div>
 
       <!-- Tombol Tambah Event -->
-      <button type="button" onclick="openAddEventModal()" class="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-5 rounded-2xl font-black text-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_10px_30px_rgba(59,130,246,0.3)] flex justify-center items-center gap-3">
+      <button onclick="openAddEventModal()" class="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-5 rounded-2xl font-black text-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_10px_30px_rgba(59,130,246,0.3)] flex justify-center items-center gap-3">
         <i data-lucide="calendar-plus" class="w-6 h-6"></i> TAMBAH EVENT KHUSUS
       </button>
     </div>
   </div>
 
 
-  <!-- MODAL: ADD/EDIT EVENT -->
+  <!-- MODAL: ADD/EDIT EVENT (FIXED KETENGAH LAYAR) -->
   <div id="modal-event-form" class="overlay-window hidden" style="display: none;">
     <div class="overlay-backdrop" onclick="closeEventModal()"></div>
     <div class="bg-[#0f172a] border border-white/10 rounded-3xl p-6 md:p-8 w-[95%] max-w-lg max-h-[90vh] overflow-y-auto shadow-[0_0_50px_rgba(0,0,0,0.8)] relative z-[999999]">
       <div class="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
         <h2 class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">📝 Detail Event</h2>
-        <button type="button" onclick="closeEventModal()" class="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10 transition-all"><i data-lucide="x" class="w-6 h-6"></i></button>
+        <button onclick="closeEventModal()" class="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10 transition-all"><i data-lucide="x" class="w-6 h-6"></i></button>
       </div>
 
       <div class="space-y-4">
@@ -417,26 +520,26 @@
         </div>
 
         <div class="flex gap-3 mt-6 pt-4 border-t border-white/10">
-          <button type="button" id="btn-ev-delete" onclick="deleteEvent()" class="hidden bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white px-5 py-3 rounded-xl font-bold transition"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
-          <button type="button" onclick="saveEventData()" class="flex-1 bg-gradient-to-r from-blue-600 to-violet-600 text-white py-3 rounded-xl font-black text-lg transition hover:scale-[1.02] shadow-[0_0_15px_rgba(59,130,246,0.4)]">SIMPAN EVENT</button>
+          <button id="btn-ev-delete" onclick="deleteEvent()" class="hidden bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white px-5 py-3 rounded-xl font-bold transition"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+          <button onclick="saveEventData()" class="flex-1 bg-gradient-to-r from-blue-600 to-violet-600 text-white py-3 rounded-xl font-black text-lg transition hover:scale-[1.02] shadow-[0_0_15px_rgba(59,130,246,0.4)]">SIMPAN EVENT</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- MODAL: EVENT REMINDER POPUP (H-X) -->
+  <!-- MODAL: EVENT REMINDER POPUP (Engine H-X) -->
   <div id="reminder-popup" class="overlay-window hidden" style="display: none;">
     <div class="overlay-backdrop" onclick="closeReminderPopup()"></div>
     <div class="bg-[#111827] border-2 border-blue-500/50 rounded-[32px] overflow-hidden w-[90%] max-w-sm shadow-[0_0_50px_rgba(59,130,246,0.3)] relative flex flex-col z-[999999]">
       <div class="bg-gradient-to-r from-blue-600 to-violet-600 p-4 text-center">
-        <h2 class="text-xl font-black text-white flex items-center justify-center gap-2 animate-pulse"><i data-lucide="calendar-star" class="w-6 h-6"></i> PENGINGAT EVENT!</h2>
+        <h2 class="text-xl font-black text-white flex items-center justify-center gap-2 animate-pulse"><i data-lucide="alarm-clock" class="w-6 h-6"></i> PENGINGAT EVENT!</h2>
       </div>
       <img id="rmd-img" src="" class="w-full aspect-video object-cover bg-black hidden">
       <div class="p-6 text-center">
         <div id="rmd-days" class="inline-block bg-blue-500/20 text-blue-400 px-4 py-1 rounded-full text-xs font-black tracking-widest mb-3 border border-blue-500/50">H-3 MENUJU HARI H</div>
         <h3 id="rmd-title" class="text-2xl font-black text-white mb-2">Nama Event</h3>
         <p id="rmd-desc" class="text-gray-400 text-sm font-medium mb-6 line-clamp-3">Deskripsi event...</p>
-        <button type="button" onclick="closeReminderPopup()" class="w-full bg-white text-black py-3 rounded-2xl font-black hover:bg-gray-200 transition active:scale-95">SIAAAAP! 🔥</button>
+        <button onclick="closeReminderPopup()" class="w-full bg-white text-black py-3 rounded-2xl font-black hover:bg-gray-200 transition active:scale-95">SIAAAAP! 🔥</button>
       </div>
     </div>
   </div>
@@ -457,13 +560,769 @@
           <input type="date" id="export-end" class="w-full bg-black/50 border border-gray-700 text-white p-3.5 rounded-2xl font-bold [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert focus:ring-2 focus:ring-blue-500 outline-none">
         </div>
         <div class="flex gap-3 mt-8">
-          <button type="button" onclick="closeBackupModal()" class="flex-1 bg-gray-800 text-white py-3.5 rounded-2xl hover:bg-gray-700 transition font-bold">Batal</button>
-          <button type="button" onclick="generatePDF()" class="flex-1 bg-gradient-to-r from-blue-600 to-violet-600 text-white py-3.5 rounded-2xl hover:opacity-90 transition font-black shadow-[0_0_15px_rgba(59,130,246,0.4)]">Download</button>
+          <button onclick="closeBackupModal()" class="flex-1 bg-gray-800 text-white py-3.5 rounded-2xl hover:bg-gray-700 transition font-bold">Batal</button>
+          <button onclick="generatePDF()" class="flex-1 bg-gradient-to-r from-blue-600 to-violet-600 text-white py-3.5 rounded-2xl hover:opacity-90 transition font-black shadow-[0_0_15px_rgba(59,130,246,0.4)]">Download</button>
         </div>
       </div>
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <!-- ============================================================== -->
+  <!-- ENGINE LOGIKA JAVASCRIPT (LITE VERSION)                        -->
+  <!-- ============================================================== -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(()=>{}); });
+    }
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault(); deferredPrompt = e;
+      document.getElementById('btn-install').classList.remove('hidden');
+    });
+    document.getElementById('btn-install').addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') document.getElementById('btn-install').classList.add('hidden');
+        deferredPrompt = null;
+      }
+    });
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    
+    function updateOnlineStatus() {
+      const txt = document.getElementById('status-text');
+      const iconWrap = document.getElementById('status-icon-wrapper');
+      if(navigator.onLine) { 
+        txt.textContent = "System Ready ⚡"; txt.className = "font-bold text-gray-200 text-sm tracking-wide"; 
+        iconWrap.innerHTML = '<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span><i data-lucide="wifi" class="relative inline-flex rounded-full w-4 h-4 text-blue-400"></i>';
+      }
+      else { 
+        txt.textContent = "Offline Mode 🛡️"; txt.className = "font-bold text-gray-400 text-sm tracking-wide"; 
+        iconWrap.innerHTML = '<i data-lucide="wifi-off" class="relative inline-flex rounded-full w-4 h-4 text-gray-500"></i>';
+      }
+      lucide.createIcons();
+    }
+
+    const liburNasional = {
+      "2026-01-01": "Tahun Baru Masehi", "2026-02-18": "Isra Mikraj Nabi Muhammad SAW", "2026-03-03": "Hari Raya Nyepi", "2026-03-20": "Idul Fitri 1447 H",
+      "2026-03-21": "Idul Fitri 1447 H", "2026-04-03": "Wafat Isa Al Masih", "2026-05-01": "Hari Buruh Internasional", "2026-05-14": "Kenaikan Isa Al Masih",
+      "2026-05-27": "Idul Adha 1447 H", "2026-06-01": "Hari Lahir Pancasila", "2026-06-16": "Tahun Baru Islam 1448 H", "2026-08-17": "Hari Kemerdekaan RI",
+      "2026-08-25": "Maulid Nabi Muhammad SAW", "2026-12-25": "Hari Raya Natal"
+    };
+
+    let db;
+    let currentDate = new Date();
+    let reminderEngineInterval = null;
+    let chartInstance = null;
+    let monthlyChartInstance = null;
+
+    let calViewDate = new Date();
+    let eventImageBlob = null; 
+    let currentEditEventId = null;
+    let currentJournalImageBlob = null;
+
+    const catColors = { 
+      'Kerja': 'text-blue-400 border-blue-500/50 bg-blue-500/10', 
+      'Kesehatan': 'text-green-400 border-green-500/50 bg-green-500/10', 
+      'Personal': 'text-blue-400 border-blue-500/50 bg-blue-500/10', 
+      'Belajar': 'text-yellow-400 border-yellow-500/50 bg-yellow-500/10',
+      'Istirahat': 'text-indigo-400 border-indigo-500/50 bg-indigo-500/10'
+    };
+
+    function getLocalISODate(dateObj) {
+      const offset = dateObj.getTimezoneOffset() * 60000;
+      return new Date(dateObj.getTime() - offset).toISOString().split('T')[0];
+    }
+
+    // Force update DB ke versi 10 untuk membersihkan bug tabel sebelumnya
+    async function initDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open('ProductivityEngineDB', 10);
+        req.onupgradeneeded = (e) => {
+          const database = e.target.result;
+          if(!database.objectStoreNames.contains('tasks')) database.createObjectStore('tasks', { keyPath: 'id' });
+          if(!database.objectStoreNames.contains('journal')) database.createObjectStore('journal', { keyPath: 'id' });
+          if(!database.objectStoreNames.contains('events')) database.createObjectStore('events', { keyPath: 'id' });
+        };
+        req.onsuccess = () => { db = req.result; resolve(); };
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    const dbAct = {
+      add: (store, data) => new Promise(res => { const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).put(data); tx.oncomplete = res; }),
+      get: (store, id) => new Promise(res => { const req = db.transaction(store).objectStore(store).get(id); req.onsuccess = () => res(req.result); }),
+      getAll: (store) => new Promise(res => { const req = db.transaction(store).objectStore(store).getAll(); req.onsuccess = () => res(req.result); }),
+      del: (store, id) => new Promise(res => { const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).delete(id); tx.oncomplete = res; })
+    };
+
+    document.querySelectorAll('.tab-button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+        document.querySelectorAll('.tab-button').forEach(b => {
+          b.classList.remove('bg-gradient-to-r', 'from-blue-600', 'to-violet-600', 'text-white', 'shadow-md'); 
+          b.classList.add('text-gray-400', 'hover:bg-white/5');
+        });
+        document.getElementById(`content-${btn.dataset.tab}`).classList.remove('hidden');
+        btn.classList.add('bg-gradient-to-r', 'from-blue-600', 'to-violet-600', 'text-white', 'shadow-md'); 
+        btn.classList.remove('text-gray-400', 'hover:bg-white/5');
+        
+        if (btn.dataset.tab === 'jadwal') renderTasks();
+        if (btn.dataset.tab === 'jurnal') loadJournal();
+        if (btn.dataset.tab === 'statistik') renderStatsTab();
+      });
+    });
+
+    ['input-date', 'input-journal-date'].forEach(id => {
+      document.getElementById(id).addEventListener('change', e => { currentDate = new Date(e.target.value); updateDateUI(); renderTasks(); loadJournal(); });
+    });
+    
+    function changeDate(days) { currentDate.setDate(currentDate.getDate() + days); updateDateUI(); renderTasks(); loadJournal(); }
+    document.getElementById('btn-prev-date').onclick = () => changeDate(-1);
+    document.getElementById('btn-next-date').onclick = () => changeDate(1);
+    document.getElementById('btn-prev-journal-date').onclick = () => changeDate(-1);
+    document.getElementById('btn-next-journal-date').onclick = () => changeDate(1);
+
+    function updateDateUI() {
+      const dStr = getLocalISODate(currentDate);
+      document.getElementById('input-date').value = dStr;
+      document.getElementById('input-journal-date').value = dStr;
+      document.getElementById('display-date').innerText = currentDate.toLocaleDateString('id-ID', { weekday:'short', year:'numeric', month:'short', day:'numeric' });
+    }
+
+    // --- ENGINE: TUGAS & AUTO-TEMPLATE (Optimized with String Builder) ---
+    async function renderTasks() {
+      const dateStr = getLocalISODate(currentDate);
+      let allTasks = await dbAct.getAll('tasks');
+      let dayTasks = allTasks.filter(t => t.date === dateStr).sort((a,b) => a.time.localeCompare(b.time));
+
+      if (dayTasks.length === 0 && allTasks.length > 0) {
+        const uniqueDates = [...new Set(allTasks.map(t => t.date))].sort().reverse();
+        let sourceDate = uniqueDates.find(d => d < dateStr) || uniqueDates[0]; 
+        
+        const tasksToCopy = allTasks.filter(t => t.date === sourceDate);
+        if (tasksToCopy.length > 0) {
+          for (const t of tasksToCopy) {
+            await dbAct.add('tasks', { ...t, id: `t_${Date.now()}_${Math.random()}`, date: dateStr, completed: false });
+          }
+          allTasks = await dbAct.getAll('tasks');
+          dayTasks = allTasks.filter(t => t.date === dateStr).sort((a,b) => a.time.localeCompare(b.time));
+        }
+      }
+
+      const container = document.getElementById('task-list-container');
+      let htmlString = '';
+      let comp = 0;
+      
+      if(dayTasks.length === 0) {
+        htmlString = '<div class="glass-card rounded-3xl p-8 text-center text-gray-500 font-bold border-dashed border-2 border-gray-700">Tidak ada jadwal sama sekali. Ambil nafas sejenak! 🛌</div>';
+      } else {
+        dayTasks.forEach(t => {
+          if(t.completed) comp++;
+          const colorCls = catColors[t.category] || 'text-gray-400 border-gray-500/50 bg-gray-500/10';
+          
+          htmlString += `
+            <div class="bg-[#1a1f2e] p-4 rounded-xl border border-white/5 flex items-center gap-4 transition-all hover:bg-[#202638] group shadow-sm relative overflow-hidden">
+              <input type="checkbox" ${t.completed ? 'checked' : ''} onchange="toggleTask('${t.id}', this.checked)" class="task-cb ml-2" />
+              <div class="flex-1 overflow-hidden">
+                <p class="font-bold text-[15px] ${t.completed ? 'line-through text-gray-500' : 'text-gray-200'} flex items-center gap-2 truncate">
+                  ${t.title} 
+                </p>
+                <div class="flex items-center gap-3 mt-1.5">
+                  <span class="text-xs font-semibold text-gray-400">${t.time}</span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${colorCls}">${t.category}</span>
+                </div>
+              </div>
+              <button onclick="deleteTask('${t.id}')" class="p-2 text-red-400 hover:text-red-300 opacity-70 hover:opacity-100 transition-opacity">
+                <i data-lucide="trash-2" class="w-5 h-5"></i>
+              </button>
+            </div>`;
+        });
+      }
+      
+      container.innerHTML = htmlString;
+      lucide.createIcons();
+      document.getElementById('stat-total').innerText = dayTasks.length;
+      document.getElementById('stat-completed').innerText = comp;
+      
+      renderChart(allTasks);
+      renderDailyBanner(dateStr);
+    }
+
+    // --- ENGINE: TAMPILAN BANNER EVENT HARIAN (Optimized) ---
+    async function renderDailyBanner(dateStr) {
+      const bannerContainer = document.getElementById('daily-event-banner');
+      if (!bannerContainer) return;
+      
+      let bannerHTML = '';
+      let hasEvent = false;
+
+      const holidayName = liburNasional[dateStr];
+      if (holidayName) {
+        hasEvent = true;
+        bannerHTML += `
+          <div class="bg-gradient-to-r from-red-600 to-red-800 rounded-3xl p-6 mb-4 shadow-[0_0_20px_rgba(220,38,38,0.3)] border border-red-500/50 flex items-center gap-5 transform transition-all hover:scale-[1.01]">
+            <div class="p-4 bg-white/20 rounded-2xl backdrop-blur-sm"><i data-lucide="flag" class="w-8 h-8 text-white"></i></div>
+            <div>
+              <p class="text-red-200 text-[10px] font-black tracking-widest uppercase mb-1">Peringatan / Libur Nasional</p>
+              <h3 class="text-2xl font-black text-white leading-tight">${holidayName}</h3>
+            </div>
+          </div>`;
+      }
+
+      const allEvents = await dbAct.getAll('events');
+      const dayEvents = allEvents.filter(e => e.date === dateStr);
+      
+      for(const ev of dayEvents) {
+        hasEvent = true;
+        let imgHTML = '';
+        if(ev.imageBlob) {
+          const imgUrl = URL.createObjectURL(ev.imageBlob);
+          imgHTML = `<img src="${imgUrl}" class="w-full h-56 object-cover rounded-2xl mb-5 border border-white/10 shadow-[0_5px_15px_rgba(0,0,0,0.3)]">`;
+        }
+        
+        bannerHTML += `
+          <div class="bg-[#151923] rounded-3xl p-6 mb-4 border-l-4 border-l-blue-500 shadow-xl border-y border-r border-white/5 relative overflow-hidden transition-all hover:-translate-y-1">
+            ${imgHTML}
+            <p class="text-blue-400 text-[10px] font-black tracking-widest uppercase mb-2 flex items-center gap-2"><i data-lucide="calendar-star" class="w-4 h-4"></i> Event Khusus Anda</p>
+            <h3 class="text-2xl font-black text-white mb-2">${ev.title}</h3>
+            ${ev.description ? `<p class="text-gray-400 text-sm font-medium mb-5 bg-black/30 p-4 rounded-xl border border-white/5">${ev.description}</p>` : ''}
+            <button onclick="editEventObj('${ev.id}')" class="bg-white/10 hover:bg-blue-500/20 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all border border-white/10 flex items-center justify-center gap-2 w-full sm:w-auto"><i data-lucide="pencil" class="w-4 h-4"></i> Edit / Hapus Event</button>
+          </div>`;
+      }
+
+      bannerContainer.innerHTML = bannerHTML;
+      bannerContainer.style.display = hasEvent ? 'block' : 'none';
+      lucide.createIcons();
+    }
+
+    async function toggleTask(id, isC) { const t = await dbAct.get('tasks', id); t.completed = isC; await dbAct.add('tasks', t); renderTasks(); }
+    async function deleteTask(id) { if(confirm('Hapus tugas ini?')) { await dbAct.del('tasks', id); renderTasks(); } }
+
+    async function saveNewTask() {
+      const title = document.getElementById('t-title').value, time = document.getElementById('t-time').value;
+      if(!title || !time) return alert('Nama dan Waktu tugas harus diisi!');
+      
+      await dbAct.add('tasks', {
+        id: `t_${Date.now()}`, title, time, category: document.getElementById('t-category').value, date: getLocalISODate(currentDate), completed: false
+      });
+      document.getElementById('t-title').value = ''; renderTasks();
+    }
+
+    function renderChart(allTasks) {
+      const labels = [], data = [];
+      for(let i=29; i>=0; i--) {
+        const d = new Date(); d.setDate(d.getDate() - i);
+        const dT = allTasks.filter(t => t.date === getLocalISODate(d));
+        labels.push(d.getDate()); data.push(dT.length ? Math.round((dT.filter(t=>t.completed).length / dT.length)*100) : 0);
+      }
+      if(chartInstance) chartInstance.destroy();
+      const ctx = document.getElementById('perfChart').getContext('2d');
+      Chart.defaults.color = '#6b7280';
+      Chart.defaults.font.family = "'Plus Jakarta Sans', sans-serif";
+      chartInstance = new Chart(ctx, { 
+        type: 'line', 
+        data: { labels, datasets: [{ data, borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.1)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#8b5cf6', pointBorderColor: '#09090b', pointBorderWidth: 1 }] }, 
+        options: { responsive: true, maintainAspectRatio: false, plugins:{legend:{display:false}, tooltip:{callbacks:{label: function(c){return c.raw+'% selesai';}}}}, scales:{y:{max:100, display:false}, x:{display:false}} } 
+      });
+    }
+
+    // --- ENGINE: KALENDER (Optimized for anti-lag) ---
+    function openCalendarModal() {
+      const modal = document.getElementById('calendar-overlay');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      modal.style.display = 'block';
+      document.body.style.overflow = 'hidden';
+      calViewDate = new Date(currentDate); 
+      renderCalendar();
+    }
+    
+    function closeCalendarModal() {
+      const modal = document.getElementById('calendar-overlay');
+      if (!modal) return;
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+      document.body.style.overflow = 'auto';
+    }
+
+    function calPrevMonth() { calViewDate.setMonth(calViewDate.getMonth() - 1); renderCalendar(); }
+    function calNextMonth() { calViewDate.setMonth(calViewDate.getMonth() + 1); renderCalendar(); }
+
+    async function renderCalendar() {
+      const gridEl = document.getElementById('calendar-grid');
+      const monthYearEl = document.getElementById('cal-month-year');
+      if (!gridEl || !monthYearEl) return;
+
+      const year = calViewDate.getFullYear();
+      const month = calViewDate.getMonth();
+      const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+      monthYearEl.innerText = `${monthNames[month]} ${year}`;
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const todayStr = getLocalISODate(new Date());
+
+      let allTasks = []; let allEvents = [];
+      try {
+        allTasks = await dbAct.getAll('tasks') || [];
+        allEvents = await dbAct.getAll('events') || [];
+      } catch (err) { console.error("Database gagal dibaca", err); return; }
+
+      let calHTML = '';
+      for (let i = 0; i < firstDay; i++) calHTML += `<div class="day-cell other-month"></div>`;
+
+      for (let i = 1; i <= daysInMonth; i++) {
+        const loopDate = new Date(year, month, i);
+        const dateStr = getLocalISODate(loopDate);
+        const isToday = dateStr === todayStr;
+        
+        const dayTasks = allTasks.filter(t => t.date === dateStr);
+        let dotsHTML = '';
+        if(dayTasks.length > 0) {
+          const maxDots = Math.min(dayTasks.length, 5); 
+          for(let d=0; d<maxDots; d++) dotsHTML += `<div class="quest-dot"></div>`;
+        }
+
+        let badgesHTML = '';
+        const holiday = liburNasional[dateStr];
+        if (holiday) {
+          badgesHTML += `<div class="event-badge bg-red-600 text-white font-black truncate border border-red-400" title="${holiday}">${holiday}</div>`;
+        }
+
+        const dayEvents = allEvents.filter(e => e.date === dateStr);
+        dayEvents.forEach(e => {
+          badgesHTML += `<div class="event-badge ev-${e.category || 'custom'}" onclick="editEventObj('${e.id}'); event.stopPropagation();">${e.title}</div>`;
+        });
+
+        calHTML += `
+          <div class="day-cell ${isToday ? 'today' : ''}" onclick="selectDateFromCalendar('${dateStr}')">
+            <div class="day-number">${i}</div>
+            <div class="quest-dots">${dotsHTML}</div>
+            <div class="event-badges">${badgesHTML}</div>
+          </div>`;
+      }
+      
+      gridEl.innerHTML = calHTML;
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function selectDateFromCalendar(dateStr) {
+      currentDate = new Date(dateStr);
+      updateDateUI();
+      renderTasks();
+      loadJournal();
+      closeCalendarModal();
+    }
+
+    function openAddEventModal() {
+      currentEditEventId = null;
+      document.getElementById('ev-id').value = '';
+      document.getElementById('ev-title').value = '';
+      document.getElementById('ev-date').value = getLocalISODate(calViewDate);
+      document.getElementById('ev-desc').value = '';
+      document.getElementById('ev-reminder').value = '0';
+      document.getElementById('ev-image').value = '';
+      document.getElementById('ev-preview-img').style.display = 'none';
+      eventImageBlob = null;
+      document.getElementById('btn-ev-delete').classList.add('hidden');
+      
+      const modal = document.getElementById('modal-event-form');
+      modal.classList.remove('hidden');
+      modal.style.display = 'flex'; 
+    }
+
+    function closeEventModal() { 
+      const modal = document.getElementById('modal-event-form');
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
+
+    async function handleEventImageUpload(file) {
+      if(!file) return null;
+      if(file.size > 5*1024*1024) { alert('Maksimal 5MB untuk gambar event!'); return null; }
+      return new Blob([await file.arrayBuffer()], { type: file.type });
+    }
+
+    async function previewEvImage(e) {
+      const file = e.target.files[0];
+      if(file) {
+        eventImageBlob = await handleEventImageUpload(file);
+        if(eventImageBlob) {
+          const img = document.getElementById('ev-preview-img');
+          img.src = URL.createObjectURL(eventImageBlob);
+          img.style.display = 'block';
+        }
+      }
+    }
+
+    async function saveEventData() {
+      const title = document.getElementById('ev-title').value;
+      const date = document.getElementById('ev-date').value;
+      if(!title || !date) return alert('Judul dan Tanggal wajib diisi!');
+
+      const evData = {
+        id: currentEditEventId || `ev_${Date.now()}`,
+        title: title,
+        date: date,
+        category: document.getElementById('ev-category').value,
+        description: document.getElementById('ev-desc').value,
+        reminderDays: parseInt(document.getElementById('ev-reminder').value),
+        reminderTriggeredDate: null,
+        imageBlob: eventImageBlob 
+      };
+
+      await dbAct.add('events', evData);
+      closeEventModal();
+      
+      if(document.getElementById('calendar-overlay').style.display !== 'none') {
+        renderCalendar();
+      }
+      renderTasks(); 
+      checkEventReminders();
+    }
+
+    async function editEventObj(id) {
+      const ev = await dbAct.get('events', id);
+      if(!ev) return;
+      currentEditEventId = ev.id;
+      document.getElementById('ev-id').value = ev.id;
+      document.getElementById('ev-title').value = ev.title;
+      document.getElementById('ev-date').value = ev.date;
+      document.getElementById('ev-category').value = ev.category;
+      document.getElementById('ev-desc').value = ev.description;
+      document.getElementById('ev-reminder').value = ev.reminderDays || 0;
+      
+      eventImageBlob = ev.imageBlob;
+      const img = document.getElementById('ev-preview-img');
+      if(ev.imageBlob) {
+        img.src = URL.createObjectURL(ev.imageBlob);
+        img.style.display = 'block';
+      } else {
+        img.style.display = 'none';
+      }
+
+      document.getElementById('btn-ev-delete').classList.remove('hidden');
+      const modal = document.getElementById('modal-event-form');
+      modal.classList.remove('hidden');
+      modal.style.display = 'flex';
+    }
+
+    async function deleteEvent() {
+      if(!currentEditEventId) return;
+      if(confirm('Hapus event ini?')) {
+        await dbAct.del('events', currentEditEventId);
+        closeEventModal();
+        if(document.getElementById('calendar-overlay').style.display !== 'none') renderCalendar();
+        renderTasks();
+      }
+    }
+
+    // --- ENGINE: PENGINGAT EVENT (H-X NOTIFIKASI) ---
+    async function checkEventReminders() {
+      const events = await dbAct.getAll('events');
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const todayIso = getLocalISODate(today);
+
+      for(const ev of events) {
+        if(!ev.reminderDays || ev.reminderDays === 0) continue; 
+        if(ev.reminderTriggeredDate === todayIso) continue; 
+
+        const evDate = new Date(ev.date);
+        evDate.setHours(0,0,0,0);
+        
+        const diffTime = evDate - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === ev.reminderDays || diffDays === 0) {
+          document.getElementById('rmd-title').innerText = ev.title;
+          document.getElementById('rmd-desc').innerText = ev.description || 'Persiapkan dirimu, hari H hampir tiba!';
+          document.getElementById('rmd-days').innerText = diffDays === 0 ? 'HARI INI! 🎉' : `H-${diffDays} MENUJU HARI H`;
+          
+          const imgEl = document.getElementById('rmd-img');
+          if(ev.imageBlob) {
+            imgEl.src = URL.createObjectURL(ev.imageBlob);
+            imgEl.style.display = 'block';
+          } else {
+            imgEl.style.display = 'none';
+          }
+          
+          const popup = document.getElementById('reminder-popup');
+          popup.classList.remove('hidden');
+          popup.style.display = 'flex';
+          
+          ev.reminderTriggeredDate = todayIso;
+          await dbAct.add('events', ev);
+          break; 
+        }
+      }
+    }
+    
+    function closeReminderPopup() { 
+      const popup = document.getElementById('reminder-popup');
+      popup.classList.add('hidden');
+      popup.style.display = 'none';
+    }
+
+    // --- ENGINE: JURNAL HARIAN (DENGAN FOTO) ---
+    document.querySelectorAll('.mood-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        if(e.target.disabled) return;
+        document.querySelectorAll('.mood-btn').forEach(b => { b.classList.remove('bg-violet-500/20', 'border-violet-500', 'text-white'); b.classList.add('border-gray-700', 'text-gray-400'); });
+        btn.classList.add('bg-violet-500/20', 'border-violet-500', 'text-white'); btn.classList.remove('border-gray-700', 'text-gray-400');
+        document.getElementById('j-mood').value = btn.dataset.mood;
+      });
+    });
+
+    async function handleJournalPhoto(e) {
+      const file = e.target.files[0];
+      if(!file) return;
+      if(file.size > 5*1024*1024) return alert('Maksimal foto 5MB ya! ✋');
+      
+      currentJournalImageBlob = new Blob([await file.arrayBuffer()], { type: file.type });
+      const imgUrl = URL.createObjectURL(currentJournalImageBlob);
+      document.getElementById('j-photo-preview').src = imgUrl;
+      document.getElementById('j-photo-preview-container').classList.remove('hidden');
+    }
+
+    function removeJournalPhoto() {
+      currentJournalImageBlob = null;
+      document.getElementById('j-photo-input').value = '';
+      document.getElementById('j-photo-preview-container').classList.add('hidden');
+    }
+
+    async function loadJournal() {
+      const dStr = getLocalISODate(currentDate), today = getLocalISODate(new Date());
+      const isToday = (dStr === today);
+      const data = await dbAct.get('journal', dStr) || {};
+
+      document.getElementById('j-tujuan').value = data.tujuan || '';
+      document.getElementById('j-prioritas').value = data.prioritas || '';
+      document.getElementById('j-energi-pagi').value = data.ePagi || 5; document.getElementById('val-energi-pagi').innerText = (data.ePagi || 5)+'/10';
+      document.getElementById('j-pencapaian').value = data.pencapaian || '';
+      document.getElementById('j-syukur').value = data.syukur || '';
+      document.getElementById('j-energi-malam').value = data.eMalam || 5; document.getElementById('val-energi-malam').innerText = (data.eMalam || 5)+'/10';
+      
+      const savedMood = data.mood || '';
+      document.getElementById('j-mood').value = savedMood;
+      document.querySelectorAll('.mood-btn').forEach(b => {
+        b.classList.remove('bg-violet-500/20', 'border-violet-500', 'text-white'); b.classList.add('border-gray-700', 'text-gray-400');
+        if(b.dataset.mood === savedMood) { b.classList.add('bg-violet-500/20', 'border-violet-500', 'text-white'); b.classList.remove('border-gray-700', 'text-gray-400'); }
+      });
+
+      if(data.imageBlob) {
+        currentJournalImageBlob = data.imageBlob;
+        document.getElementById('j-photo-preview').src = URL.createObjectURL(currentJournalImageBlob);
+        document.getElementById('j-photo-preview-container').classList.remove('hidden');
+      } else {
+        removeJournalPhoto();
+      }
+
+      document.getElementById('journal-readonly-warning').style.display = isToday ? 'none' : 'flex';
+      document.getElementById('btn-save-journal').style.display = isToday ? 'flex' : 'none';
+      document.querySelectorAll('.j-input').forEach(el => { el.disabled = !isToday; el.style.opacity = isToday ? '1' : '0.4'; el.style.cursor = isToday ? 'auto' : 'not-allowed'; });
+
+      const allJ = await dbAct.getAll('journal');
+      document.getElementById('j-stat-total').innerText = allJ.length;
+      document.getElementById('j-stat-month').innerText = allJ.filter(j => j.date.startsWith(today.substring(0,7))).length;
+      let streak = 0, cd = new Date();
+      while(true) {
+        const cStr = getLocalISODate(cd);
+        if(allJ.find(j => j.date === cStr)) { streak++; cd.setDate(cd.getDate()-1); }
+        else if(cStr === today) { cd.setDate(cd.getDate()-1); } else break;
+      }
+      document.getElementById('j-stat-streak').innerText = streak;
+    }
+
+    async function saveJournalLogic() {
+      await dbAct.add('journal', {
+        id: getLocalISODate(currentDate), date: getLocalISODate(currentDate),
+        tujuan: document.getElementById('j-tujuan').value, prioritas: document.getElementById('j-prioritas').value, ePagi: document.getElementById('j-energi-pagi').value,
+        pencapaian: document.getElementById('j-pencapaian').value, syukur: document.getElementById('j-syukur').value, eMalam: document.getElementById('j-energi-malam').value, mood: document.getElementById('j-mood').value,
+        imageBlob: currentJournalImageBlob
+      });
+      alert('Vibes dan memori terkunci! 🔒✨'); loadJournal();
+    }
+
+    // --- ENGINE: STATISTIK & 12 BULAN MATRIKS ---
+    async function renderStatsTab() {
+      const allTasks = await dbAct.getAll('tasks');
+      let activeDaysCount = 0, perfectDaysCount = 0, totalCompletionSum = 0, peakCompletion = 0;
+      const labels30 = [], data30 = [];
+      
+      for(let i=29; i>=0; i--) {
+        const d = new Date(); d.setDate(d.getDate() - i);
+        const dateStr = getLocalISODate(d);
+        const dayTasks = allTasks.filter(t => t.date === dateStr);
+        labels30.push(d.getDate());
+        
+        if(dayTasks.length > 0) {
+          activeDaysCount++;
+          const comp = dayTasks.filter(t => t.completed).length;
+          const rate = Math.round((comp / dayTasks.length) * 100);
+          
+          if(rate === 100) perfectDaysCount++;
+          if(rate > peakCompletion) peakCompletion = rate;
+          
+          totalCompletionSum += rate; data30.push(rate);
+        } else { data30.push(0); }
+      }
+      
+      const avgCompletion = activeDaysCount > 0 ? Math.round(totalCompletionSum / activeDaysCount) : 0;
+      
+      document.getElementById('stat-avg-completion').innerText = avgCompletion + '%';
+      document.getElementById('stat-perfect-days').innerText = perfectDaysCount;
+      document.getElementById('stat-active-days').innerText = activeDaysCount;
+      document.getElementById('stat-peak-completion').innerText = peakCompletion + '%';
+      
+      if(window.consistencyChartInstance) window.consistencyChartInstance.destroy();
+      const ctx30 = document.getElementById('consistencyChart').getContext('2d');
+      Chart.defaults.color = '#6b7280';
+      Chart.defaults.font.family = "'Plus Jakarta Sans', sans-serif";
+      
+      window.consistencyChartInstance = new Chart(ctx30, { 
+        type: 'bar', 
+        data: { labels: labels30, datasets: [{ data: data30, backgroundColor: '#4ade80', borderRadius: 4, barThickness: 8 }] }, 
+        options: { responsive: true, maintainAspectRatio: false, plugins:{legend:{display:false}, tooltip:{callbacks:{label: function(c){return c.raw+'% selesai';}}}}, scales:{ y:{max:100, display:false}, x:{ grid: { display: false }, ticks: { color: '#6b7280', font: { size: 10 } } } } } 
+      });
+
+      const year = new Date().getFullYear();
+      const monthlyData = new Array(12).fill(0);
+      const monthlyTaskCount = new Array(12).fill(0);
+      const monthlyCompletedCount = new Array(12).fill(0);
+
+      allTasks.forEach(t => {
+        const tDate = new Date(t.date);
+        if (tDate.getFullYear() === year) {
+          const mIndex = tDate.getMonth();
+          monthlyTaskCount[mIndex]++;
+          if (t.completed) monthlyCompletedCount[mIndex]++;
+        }
+      });
+
+      for (let i = 0; i < 12; i++) {
+        if (monthlyTaskCount[i] > 0) {
+          monthlyData[i] = Math.round((monthlyCompletedCount[i] / monthlyTaskCount[i]) * 100);
+        }
+      }
+
+      if(window.monthlyChartInstance) window.monthlyChartInstance.destroy();
+      const ctxMonthly = document.getElementById('monthlyChart').getContext('2d');
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
+      
+      window.monthlyChartInstance = new Chart(ctxMonthly, {
+        type: 'bar',
+        data: {
+          labels: monthNames,
+          datasets: [{ data: monthlyData, backgroundColor: '#10b981', borderRadius: 4, barThickness: 12 }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: function(c) { return 'Rata-rata: ' + c.raw + '%'; } } }
+          },
+          scales: {
+            y: { max: 100, display: false },
+            x: { grid: { display: false }, ticks: { color: '#6b7280', font: { size: 11, weight: 'bold' } } }
+          }
+        }
+      });
+    }
+
+    // --- ENGINE: EXPORT PDF ---
+    function openBackupModal() {
+      const d = new Date(); document.getElementById('export-end').value = getLocalISODate(d);
+      d.setDate(d.getDate() - 7); document.getElementById('export-start').value = getLocalISODate(d);
+      const modal = document.getElementById('modal-export');
+      modal.classList.remove('hidden');
+      modal.style.display = 'flex';
+    }
+    
+    function closeBackupModal() { 
+      const modal = document.getElementById('modal-export');
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
+    
+    function blobToBase64(blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    async function generatePDF() {
+      const start = document.getElementById('export-start').value, end = document.getElementById('export-end').value;
+      const allJ = await dbAct.getAll('journal');
+      const filtered = allJ.filter(j => j.date >= start && j.date <= end).sort((a,b)=>a.date.localeCompare(b.date));
+      if(!filtered.length) return alert('Tidak ada catatan jurnal di tanggal tersebut.');
+      
+      const { jsPDF } = window.jspdf; 
+      const doc = new jsPDF();
+      
+      doc.setFontSize(22); doc.setFont(undefined, 'bold'); doc.text("VibeCheck Logs", 105, 20, { align: "center" });
+      doc.setFontSize(11); doc.setFont(undefined, 'normal'); doc.text(`Rentang: ${start} hingga ${end}`, 105, 28, { align: "center" });
+      doc.line(20, 32, 190, 32);
+      
+      let y = 45;
+      
+      for (let i = 0; i < filtered.length; i++) {
+        const j = filtered[i];
+        if(y > 240) { doc.addPage(); y = 20; }
+        
+        doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.text(j.date, 20, y); y += 6;
+        doc.setFontSize(10); doc.setFont(undefined, 'normal');
+        
+        const pr = (lbl, txt) => { 
+          if(!txt)return; 
+          const sp = doc.splitTextToSize(`${lbl}: ${txt}`, 170); 
+          doc.text(sp, 20, y); 
+          y += (sp.length * 5); 
+        };
+        
+        pr('Satu Hal Utama', j.tujuan); 
+        pr('Persiapan Hambatan', j.prioritas); 
+        pr('Pencapaian', j.pencapaian); 
+        pr('Rasa Syukur', j.syukur);
+        
+        doc.setFont(undefined, 'italic'); 
+        doc.text(`Level Baterai (Pagi: ${j.ePagi}/10 | Malam: ${j.eMalam}/10) | Vibe: ${j.mood}`, 20, y); 
+        y += 8;
+
+        if (j.imageBlob) {
+          if (y > 210) { doc.addPage(); y = 20; }
+          try {
+            const base64Img = await blobToBase64(j.imageBlob);
+            doc.addImage(base64Img, 'JPEG', 20, y, 80, 60); 
+            y += 65; 
+          } catch (err) { console.error("Gagal load gambar untuk PDF", err); }
+        }
+        y += 10; 
+      }
+      
+      doc.save(`VibeCheck_Jurnal_${start}.pdf`); 
+      closeBackupModal();
+    }
+
+    // --- INIT APP ---
+    window.onload = async () => {
+      await initDB(); 
+      updateDateUI(); 
+      updateOnlineStatus();
+      await renderTasks(); 
+      
+      // Cek pengingat hanya untuk kalender (H-X)
+      await checkEventReminders();
+      reminderEngineInterval = setInterval(checkEventReminders, 60000);
+
+      lucide.createIcons(); 
+      console.log("Engine Lite Fired Up 🔥");
+    };
+  </script>
 </body>
 </html>
