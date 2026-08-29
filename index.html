@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VibeCheck: Jadwal, Jurnal & Kalender</title>
+  
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#3b82f6">
+  <meta name="description" content="Aplikasi offline cerdas untuk jadwal dan jurnal harian">
+  
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  
+  <!-- CDN Libraries -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <!-- Panggilan ke file CSS eksternal -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="min-h-screen bg-[#09090b] text-gray-100 pb-24 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/20 via-[#09090b] to-[#09090b]">
+  
+  <div class="max-w-6xl mx-auto p-4 md:p-8" id="main-app">
+    
+    <!-- Status Bar & Global Controls -->
+    <div id="status-bar" class="mb-6 rounded-3xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between glass-card border-l-4 border-blue-500 gap-4 transition-all hover:shadow-[0_0_20px_rgba(59,130,246,0.15)]">
+      <div class="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-full border border-white/5">
+        <span id="status-icon-wrapper" class="relative flex h-4 w-4">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+          <i data-lucide="wifi" class="relative inline-flex rounded-full w-4 h-4 text-blue-400"></i>
+        </span>
+        <span id="status-text" class="font-bold text-gray-200 text-sm tracking-wide">System Ready ⚡</span>
+      </div>
+      
+      <div class="flex gap-3 flex-wrap items-center">
+        <button id="btn-install" class="hidden flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-violet-600 text-white px-5 py-2.5 rounded-full hover:scale-105 active:scale-95 font-extrabold transition-all shadow-[0_0_15px_rgba(59,130,246,0.4)]">
+          <i data-lucide="download" class="w-4 h-4"></i> Install App
+        </button>
+        <button onclick="openBackupModal()" class="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white px-5 py-2.5 rounded-full text-sm font-bold transition-all border border-white/10 hover:scale-105 active:scale-95">
+          <i data-lucide="download-cloud" class="w-4 h-4"></i> Ekspor PDF
+        </button>
+      </div>
+    </div>
+
+    <!-- Header & TRIGGER KALENDER -->
+    <div class="mb-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div class="flex items-center gap-4">
+        <div class="p-3 bg-gradient-to-br from-blue-500 to-violet-600 rounded-2xl shadow-[0_0_20px_rgba(139,92,246,0.3)] transform -rotate-3 hover:rotate-0 transition-transform">
+          <i data-lucide="zap" class="w-8 h-8 text-white fill-white/20"></i>
+        </div>
+        <div>
+          <h1 class="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-violet-400 to-cyan-400 tracking-tight">VibeCheck.</h1>
+          <p class="text-gray-400 text-sm font-medium mt-1">Conquer your day, completely offline 🚀</p>
+        </div>
+      </div>
+      
+      <!-- Tombol Trigger Buka Kalender -->
+      <button onclick="openCalendarModal()" class="group flex items-center gap-3 bg-blue-500/10 hover:bg-blue-500/20 px-6 py-4 rounded-2xl border border-blue-500/30 backdrop-blur-md transition-all hover:scale-105 active:scale-95 shadow-inner cursor-pointer">
+        <i data-lucide="calendar-days" class="w-6 h-6 text-blue-400 group-hover:animate-bounce"></i>
+        <div id="display-date" class="text-lg font-bold text-blue-200 tracking-wide uppercase"></div>
+      </button>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="glass-card rounded-2xl p-2 mb-10 flex gap-2 flex-wrap sm:flex-nowrap overflow-x-auto hide-scrollbar">
+      <button class="tab-button flex-1 px-6 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-md hover:shadow-lg active:scale-95 whitespace-nowrap" data-tab="jadwal">
+        <i data-lucide="list-todo" class="w-5 h-5"></i> Quests
+      </button>
+      <button class="tab-button flex-1 px-6 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-gray-400 hover:bg-white/5 hover:text-gray-100 active:scale-95 whitespace-nowrap" data-tab="jurnal">
+        <i data-lucide="book-open" class="w-5 h-5"></i> Journal
+      </button>
+      <button class="tab-button flex-1 px-6 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-gray-400 hover:bg-white/5 hover:text-gray-100 active:scale-95 whitespace-nowrap" data-tab="statistik">
+        <i data-lucide="activity" class="w-5 h-5"></i> Stats
+      </button>
+    </div>
+
+    <!-- ========== TAB 1: JADWAL TUGAS ========== -->
+    <div id="content-jadwal" class="tab-content">
+      <!-- Date Navigator -->
+      <div class="glass-card rounded-2xl p-3 mb-8 flex items-center justify-between gap-4 max-w-sm mx-auto">
+        <button id="btn-prev-date" class="p-3 bg-white/5 rounded-xl hover:bg-white/10 active:scale-90 transition-all text-blue-400"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
+        <input type="date" id="input-date" class="bg-transparent border-none text-white font-black focus:outline-none text-center text-lg [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert" />
+        <button id="btn-next-date" class="p-3 bg-white/5 rounded-xl hover:bg-white/10 active:scale-90 transition-all text-blue-400"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
+      </div>
+
+      <!-- Quick Stats -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+        <div class="bg-[#151923] rounded-xl p-5 border border-white/5 border-t-4 border-t-blue-500 shadow-lg relative overflow-hidden transition-all hover:-translate-y-1">
+          <p class="text-gray-400 text-[10px] font-black tracking-widest mb-1 uppercase">TOTAL TUGAS</p>
+          <p id="stat-total" class="text-3xl font-black text-blue-400">0</p>
+        </div>
+        <div class="bg-[#151923] rounded-xl p-5 border border-white/5 border-t-4 border-t-green-500 shadow-lg relative overflow-hidden transition-all hover:-translate-y-1">
+          <p class="text-gray-400 text-[10px] font-black tracking-widest mb-1 uppercase">SELESAI</p>
+          <p id="stat-completed" class="text-3xl font-black text-green-400">0</p>
+        </div>
+        <div class="col-span-2 bg-[#151923] rounded-xl p-5 border border-white/5 border-t-4 border-t-violet-500 shadow-lg transition-all hover:-translate-y-1">
+          <p class="text-gray-400 text-[10px] font-black tracking-widest mb-2 flex items-center gap-2 uppercase">
+            <i data-lucide="trending-up" class="w-4 h-4 text-violet-400"></i> GRAFIK PERFORMA 30 HARI
+          </p>
+          <div class="w-full h-16"><canvas id="perfChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Form Tambah Tugas -->
+      <div class="glass-card rounded-3xl p-1 mb-10 bg-gradient-to-b from-white/10 to-transparent p-[1px]">
+        <div class="bg-[#0f1117] rounded-[23px] p-6 sm:p-8">
+          <div class="flex items-center gap-3 mb-2">
+            <div class="p-2 bg-blue-500/20 rounded-lg"><i data-lucide="plus-circle" class="w-6 h-6 text-blue-400"></i></div>
+            <h2 class="text-2xl font-black text-white">Add New Quest</h2>
+          </div>
+          <p class="text-gray-500 text-sm mb-6 font-medium">Sistem pintar: Jadwal otomatis dilanjutkan dari hari terakhir Anda! 💅</p>
+          
+          <div class="space-y-5">
+            <div class="flex flex-col md:flex-row gap-4">
+              <input type="text" id="t-title" placeholder="Nama tugas..." class="flex-1 bg-black/40 border border-gray-700 text-white px-5 py-3.5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all font-medium" />
+              <input type="time" id="t-time" class="bg-black/40 border border-gray-700 text-white px-5 py-3.5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-medium [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert" />
+              <select id="t-category" class="bg-black/40 border border-gray-700 text-white px-5 py-3.5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-medium appearance-none">
+                <option value="Kerja">💻 Kerja</option><option value="Kesehatan">💪 Kesehatan</option>
+                <option value="Belajar">📚 Belajar</option><option value="Istirahat">🧘 Istirahat</option>
+                <option value="Personal">✨ Personal</option>
+              </select>
+            </div>
+            
+            <button onclick="saveNewTask()" class="w-full bg-gradient-to-r from-blue-600 to-violet-600 text-white px-8 py-4 rounded-2xl hover:from-blue-500 hover:to-violet-500 hover:-translate-y-1 active:scale-[0.98] font-black text-lg transition-all flex justify-center items-center gap-2 shadow-[0_10px_20px_-10px_rgba(59,130,246,0.5)] mt-4">
+              <i data-lucide="zap" class="w-5 h-5 fill-white"></i> SIMPAN TUGAS
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Task List Container -->
+      <div id="task-list-container" class="space-y-3"></div>
+
+      <!-- TEMPAT BANNER EVENT MUNCUL OTOMATIS -->
+      <div id="daily-event-banner" class="mt-6" style="display: none;"></div>
+    </div>
+
+    <!-- ========== TAB 2: JURNAL HARIAN ========== -->
+    <div id="content-jurnal" class="tab-content hidden">
+      <!-- Date Nav -->
+      <div class="glass-card rounded-2xl p-3 mb-6 flex items-center justify-between gap-4 max-w-sm mx-auto">
+        <button id="btn-prev-journal-date" class="p-3 bg-white/5 rounded-xl hover:bg-white/10 active:scale-90 transition-all text-violet-400"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
+        <input type="date" id="input-journal-date" class="bg-transparent border-none text-white font-black focus:outline-none text-center text-lg [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert" />
+        <button id="btn-next-journal-date" class="p-3 bg-white/5 rounded-xl hover:bg-white/10 active:scale-90 transition-all text-violet-400"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
+      </div>
+
+      <div id="journal-readonly-warning" class="hidden mb-6 p-4 bg-orange-500/10 border border-orange-500/50 rounded-2xl text-orange-400 font-bold flex items-center gap-3 backdrop-blur-md">
+        <div class="p-2 bg-orange-500/20 rounded-full"><i data-lucide="lock" class="w-5 h-5"></i></div>
+        <span>Mode Mesin Waktu: Anda melihat masa lalu. Jurnal terkunci. 🔒</span>
+      </div>
+
+      <div class="grid grid-cols-3 gap-4 mb-8">
+        <div class="glass-card rounded-3xl p-5 text-center border-t-2 border-orange-500 relative overflow-hidden">
+          <div class="absolute inset-0 bg-gradient-to-b from-orange-500/10 to-transparent"></div>
+          <p class="text-xs text-orange-400 font-extrabold tracking-widest relative z-10">STREAK 🔥</p>
+          <p class="text-3xl font-black text-white mt-1 relative z-10"><span id="j-stat-streak">0</span> <span class="text-sm font-bold text-gray-400">hari</span></p>
+        </div>
+        <div class="glass-card rounded-3xl p-5 text-center border-t-2 border-violet-500">
+          <p class="text-xs text-violet-400 font-extrabold tracking-widest">BULAN INI</p>
+          <p id="j-stat-month" class="text-3xl font-black text-white mt-1">0</p>
+        </div>
+        <div class="glass-card rounded-3xl p-5 text-center border-t-2 border-cyan-500">
+          <p class="text-xs text-cyan-400 font-extrabold tracking-widest">TOTAL LOG</p>
+          <p id="j-stat-total" class="text-3xl font-black text-white mt-1">0</p>
+        </div>
+      </div>
+
+      <div class="max-w-3xl mx-auto space-y-8">
+        <div class="glass-card rounded-[32px] p-8 border border-white/5 relative overflow-hidden">
+          <div class="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 rounded-full blur-[80px]"></div>
+          
+          <div class="flex items-center gap-3 mb-8 relative z-10">
+            <div class="p-3 bg-blue-500/20 rounded-2xl"><i data-lucide="sunrise" class="w-6 h-6 text-blue-400"></i></div>
+            <h3 class="text-xl font-black text-white tracking-tight">MORNING VIBES <span class="text-blue-400 block text-xs font-bold tracking-widest uppercase mt-0.5">Tentukan Niatmu</span></h3>
+          </div>
+          
+          <div class="space-y-6 relative z-10">
+            <div>
+              <label class="block text-xs font-extrabold text-gray-400 mb-2 tracking-widest">SATU HAL UTAMA 🎯</label>
+              <textarea id="j-tujuan" class="j-input w-full bg-black/40 border border-gray-700 rounded-2xl p-5 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium resize-none" rows="2" placeholder="Satu hal yang kalau tercapai bikin hari ini menang..."></textarea>
+            </div>
+            
+            <div>
+              <label class="block text-xs font-extrabold text-gray-400 mb-2 tracking-widest">PERSIAPAN HAMBATAN 🚧</label>
+              <textarea id="j-prioritas" class="j-input w-full bg-black/40 border border-gray-700 rounded-2xl p-5 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium resize-none" rows="2" placeholder="Hambatan yang mungkin muncul & cara menghindarinya..."></textarea>
+            </div>
+            
+            <div class="bg-black/30 p-5 rounded-2xl border border-white/5">
+              <div class="flex justify-between items-center mb-4">
+                <label class="block text-xs font-extrabold text-gray-400 tracking-widest">LEVEL BATERAI PAGI 🔋</label>
+                <span id="val-energi-pagi" class="text-lg font-black text-blue-400 bg-blue-500/10 px-3 py-1 rounded-lg">5/10</span>
+              </div>
+              <input type="range" id="j-energi-pagi" min="1" max="10" value="5" class="j-input w-full accent-blue-500" oninput="document.getElementById('val-energi-pagi').innerText = this.value + '/10'">
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-card rounded-[32px] p-8 border border-white/5 relative overflow-hidden">
+          <div class="absolute bottom-0 left-0 w-64 h-64 bg-violet-600/10 rounded-full blur-[80px]"></div>
+          
+          <div class="flex items-center gap-3 mb-8 relative z-10">
+            <div class="p-3 bg-violet-500/20 rounded-2xl"><i data-lucide="moon-star" class="w-6 h-6 text-violet-400"></i></div>
+            <h3 class="text-xl font-black text-white tracking-tight">NIGHT REFLECTIONS <span class="text-violet-400 block text-xs font-bold tracking-widest uppercase mt-0.5">Tutup Hari Ini</span></h3>
+          </div>
+          
+          <div class="space-y-6 relative z-10">
+            <div>
+              <label class="block text-xs font-extrabold text-gray-400 mb-2 tracking-widest">PENCAPAIAN HARI INI 🏆</label>
+              <textarea id="j-pencapaian" class="j-input w-full bg-black/40 border border-gray-700 rounded-2xl p-5 text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all font-medium resize-none" rows="2" placeholder="Besar atau kecil, pencapaian keren apa hari ini?"></textarea>
+            </div>
+            
+            <div>
+              <label class="block text-xs font-extrabold text-gray-400 mb-2 tracking-widest">RASA SYUKUR 🙏</label>
+              <textarea id="j-syukur" class="j-input w-full bg-black/40 border border-gray-700 rounded-2xl p-5 text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all font-medium resize-none" rows="2" placeholder="Sebutkan 3 hal yang bikin kamu bersyukur hari ini..."></textarea>
+            </div>
+            
+            <div class="bg-black/30 p-5 rounded-2xl border border-white/5">
+              <div class="flex justify-between items-center mb-4">
+                <label class="block text-xs font-extrabold text-gray-400 tracking-widest">SISA BATERAI MALAM 🪫</label>
+                <span id="val-energi-malam" class="text-lg font-black text-violet-400 bg-violet-500/10 px-3 py-1 rounded-lg">5/10</span>
+              </div>
+              <input type="range" id="j-energi-malam" min="1" max="10" value="5" class="j-input w-full accent-violet-500" oninput="document.getElementById('val-energi-malam').innerText = this.value + '/10'">
+            </div>
+            
+            <div>
+              <label class="block text-xs font-extrabold text-gray-400 mb-4 tracking-widest">VIBE CHECK HARI INI ✨</label>
+              <div class="flex flex-wrap gap-3" id="mood-container">
+                <button class="mood-btn j-input px-5 py-2.5 rounded-full border-2 border-gray-700 text-sm font-bold text-gray-400 hover:border-violet-500 hover:text-white transition-all active:scale-95 flex items-center gap-2" data-mood="Santai 😌">😌 Santai</button>
+                <button class="mood-btn j-input px-5 py-2.5 rounded-full border-2 border-gray-700 text-sm font-bold text-gray-400 hover:border-violet-500 hover:text-white transition-all active:scale-95 flex items-center gap-2" data-mood="Bersyukur 💖">💖 Bersyukur</button>
+                <button class="mood-btn j-input px-5 py-2.5 rounded-full border-2 border-gray-700 text-sm font-bold text-gray-400 hover:border-violet-500 hover:text-white transition-all active:scale-95 flex items-center gap-2" data-mood="Fokus 🎯">🎯 Fokus</button>
+                <button class="mood-btn j-input px-5 py-2.5 rounded-full border-2 border-gray-700 text-sm font-bold text-gray-400 hover:border-violet-500 hover:text-white transition-all active:scale-95 flex items-center gap-2" data-mood="Kelelahan 😵">😵 Kelelahan</button>
+                <button class="mood-btn j-input px-5 py-2.5 rounded-full border-2 border-gray-700 text-sm font-bold text-gray-400 hover:border-violet-500 hover:text-white transition-all active:scale-95 flex items-center gap-2" data-mood="Semangat 🔥">🔥 Semangat</button>
+                <button class="mood-btn j-input px-5 py-2.5 rounded-full border-2 border-gray-700 text-sm font-bold text-gray-400 hover:border-violet-500 hover:text-white transition-all active:scale-95 flex items-center gap-2" data-mood="Cemas 🌪️">🌪️ Cemas</button>
+              </div>
+              <input type="hidden" id="j-mood" value="">
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-card rounded-[32px] p-8 border border-white/5 relative overflow-hidden text-center">
+          <div class="flex items-center justify-center gap-3 mb-4 relative z-10">
+            <div class="p-3 bg-blue-500/20 rounded-2xl"><i data-lucide="camera" class="w-6 h-6 text-blue-400"></i></div>
+            <h3 class="text-xl font-black text-white tracking-tight">ABADIKAN MOMEN 📸</h3>
+          </div>
+          <p class="text-gray-400 text-sm font-medium mb-6">Satu foto yang mendeskripsikan hari ini (Opsional).</p>
+          
+          <input type="file" id="j-photo-input" accept="image/*" class="hidden j-input" onchange="handleJournalPhoto(event)" />
+          <button onclick="document.getElementById('j-photo-input').click()" class="j-input bg-white/10 hover:bg-white/20 text-white px-8 py-3 rounded-full font-bold transition-all inline-flex items-center gap-2 border border-white/10">
+            <i data-lucide="image-plus" class="w-5 h-5"></i> Pilih Foto
+          </button>
+          
+          <div id="j-photo-preview-container" class="mt-6 relative hidden max-w-sm mx-auto">
+            <img id="j-photo-preview" src="" class="rounded-2xl border border-white/20 shadow-lg object-cover w-full max-h-64">
+            <button onclick="removeJournalPhoto()" class="j-input absolute -top-3 -right-3 bg-red-500 text-white p-2 rounded-full hover:scale-110 transition shadow-lg">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <button id="btn-save-journal" onclick="saveJournalLogic()" class="w-full bg-gradient-to-r from-cyan-500 via-violet-500 to-blue-500 text-white py-5 rounded-2xl font-black text-lg hover:shadow-[0_0_30px_rgba(139,92,246,0.5)] transition-all hover:-translate-y-1 active:scale-[0.98] flex items-center justify-center gap-3">
+          <i data-lucide="save" class="w-6 h-6"></i> KUNCI JURNAL INI 🔒
+        </button>
+      </div>
+    </div>
+
+    <!-- ========== TAB 4: STATISTIK ========== -->
+    <div id="content-statistik" class="tab-content hidden">
+      <div class="max-w-4xl mx-auto space-y-4">
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div class="bg-cyan-500/10 rounded-2xl p-5 border border-cyan-500/20 shadow-[0_0_15px_rgba(34,211,238,0.1)] relative overflow-hidden transition-all hover:scale-[1.02]">
+            <div class="absolute -right-4 -top-4 w-16 h-16 bg-cyan-400/20 rounded-full blur-xl"></div>
+            <p class="text-cyan-400 text-[10px] font-black tracking-widest flex items-center gap-2 mb-2 uppercase"><i data-lucide="trending-up" class="w-4 h-4"></i> Rata-Rata</p>
+            <p id="stat-avg-completion" class="text-3xl md:text-4xl font-black text-cyan-300">0%</p>
+            <p class="text-cyan-500/70 text-xs font-bold mt-1">hari aktif</p>
+          </div>
+          
+          <div class="bg-[#151923] rounded-2xl p-5 border border-white/5 shadow-lg transition-all hover:scale-[1.02]">
+            <p class="text-gray-400 text-[10px] font-black tracking-widest flex items-center gap-2 mb-2 uppercase"><i data-lucide="target" class="w-4 h-4"></i> Hari Sempurna</p>
+            <p id="stat-perfect-days" class="text-3xl md:text-4xl font-black text-white">0</p>
+            <p class="text-gray-500 text-xs font-bold mt-1">100% selesai</p>
+          </div>
+          
+          <div class="bg-[#151923] rounded-2xl p-5 border border-white/5 shadow-lg transition-all hover:scale-[1.02]">
+            <p class="text-gray-400 text-[10px] font-black tracking-widest flex items-center gap-2 mb-2 uppercase"><i data-lucide="calendar" class="w-4 h-4"></i> Hari Aktif</p>
+            <p id="stat-active-days" class="text-3xl md:text-4xl font-black text-white">0</p>
+            <p class="text-gray-500 text-xs font-bold mt-1">dari 30 hari</p>
+          </div>
+          
+          <div class="bg-[#151923] rounded-2xl p-5 border border-white/5 shadow-lg transition-all hover:scale-[1.02]">
+            <p class="text-gray-400 text-[10px] font-black tracking-widest flex items-center gap-2 mb-2 uppercase"><i data-lucide="zap" class="w-4 h-4"></i> Puncak</p>
+            <p id="stat-peak-completion" class="text-3xl md:text-4xl font-black text-white">0%</p>
+            <p class="text-gray-500 text-xs font-bold mt-1">capaian terbaik</p>
+          </div>
+        </div>
+
+        <div class="bg-[#151923] rounded-[24px] p-6 border border-white/5 shadow-lg transition-all">
+          <p class="text-gray-300 text-[11px] font-black tracking-widest uppercase mb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-1">
+            Matriks Konsistensi - 30 Hari 
+            <span class="text-gray-500 text-[10px] lowercase font-bold tracking-normal">% tugas selesai</span>
+          </p>
+          <div class="w-full h-48"><canvas id="consistencyChart"></canvas></div>
+        </div>
+
+        <div class="bg-[#151923] rounded-[24px] p-6 border border-white/5 shadow-lg transition-all mt-4">
+          <p class="text-gray-300 text-[11px] font-black tracking-widest uppercase mb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-1">
+            Rata-Rata Per Bulan - Tahun Ini 
+            <span class="text-gray-500 text-[10px] lowercase font-bold tracking-normal">% tugas selesai bulanan</span>
+          </p>
+          <div class="w-full h-48"><canvas id="monthlyChart"></canvas></div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- OVERLAY KALENDER TAHUNAN -->
+  <div id="calendar-overlay" class="overlay-window hidden" style="display: none;">
+    <div class="cal-container pb-32 w-full h-full">
+      <div class="cal-header mb-8 flex items-center justify-between mt-10">
+        <button onclick="closeCalendarModal()" class="bg-white/10 hover:bg-red-500/80 text-white p-3 rounded-full backdrop-blur-md transition-all active:scale-90 shadow-lg flex items-center gap-2 z-50">
+          <i data-lucide="x" class="w-6 h-6"></i>
+        </button>
+        <h1 class="flex-1 text-center pr-10">🗓️ Manajemen Event</h1>
+      </div>
+
+      <div class="flex justify-between items-center mb-8 bg-white/5 p-4 rounded-2xl backdrop-blur-md border border-white/10">
+        <button onclick="calPrevMonth()" class="bg-black/30 hover:bg-blue-500/20 text-white p-3 rounded-xl font-bold transition border border-white/10">
+          <i data-lucide="chevron-left" class="w-6 h-6"></i>
+        </button>
+        <div class="font-black text-xl sm:text-2xl text-white tracking-widest uppercase text-center" id="cal-month-year"></div>
+        <button onclick="calNextMonth()" class="bg-black/30 hover:bg-blue-500/20 text-white p-3 rounded-xl font-bold transition border border-white/10">
+          <i data-lucide="chevron-right" class="w-6 h-6"></i>
+        </button>
+      </div>
+
+      <div class="bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl mb-8">
+        <div class="grid grid-cols-7 gap-1 md:gap-2 mb-4 text-center">
+          <div class="text-blue-400 font-black text-xs md:text-sm uppercase">Min</div>
+          <div class="text-gray-400 font-bold text-xs md:text-sm uppercase">Sen</div>
+          <div class="text-gray-400 font-bold text-xs md:text-sm uppercase">Sel</div>
+          <div class="text-gray-400 font-bold text-xs md:text-sm uppercase">Rab</div>
+          <div class="text-gray-400 font-bold text-xs md:text-sm uppercase">Kam</div>
+          <div class="text-gray-400 font-bold text-xs md:text-sm uppercase">Jum</div>
+          <div class="text-cyan-400 font-black text-xs md:text-sm uppercase">Sab</div>
+        </div>
+        <div class="cal-grid" id="calendar-grid"></div>
+      </div>
+
+      <button onclick="openAddEventModal()" class="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-5 rounded-2xl font-black text-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_10px_30px_rgba(59,130,246,0.3)] flex justify-center items-center gap-3">
+        <i data-lucide="calendar-plus" class="w-6 h-6"></i> TAMBAH EVENT KHUSUS
+      </button>
+    </div>
+  </div>
+
+
+  <!-- MODAL: ADD/EDIT EVENT -->
+  <div id="modal-event-form" class="overlay-window hidden" style="display: none;">
+    <div class="overlay-backdrop" onclick="closeEventModal()"></div>
+    <div class="bg-[#0f172a] border border-white/10 rounded-3xl p-6 md:p-8 w-[95%] max-w-lg max-h-[90vh] overflow-y-auto shadow-[0_0_50px_rgba(0,0,0,0.8)] relative z-[999999]">
+      <div class="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+        <h2 class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">📝 Detail Event</h2>
+        <button onclick="closeEventModal()" class="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10 transition-all"><i data-lucide="x" class="w-6 h-6"></i></button>
+      </div>
+
+      <div class="space-y-4">
+        <input type="hidden" id="ev-id">
+        <div>
+          <label class="block text-xs font-bold text-gray-400 mb-2 uppercase">Judul Event</label>
+          <input type="text" id="ev-title" class="w-full bg-black/50 border border-gray-700 text-white p-3 rounded-xl focus:border-blue-500 focus:outline-none" placeholder="Konser, Ujian, Liburan...">
+        </div>
+        <div class="flex gap-4">
+          <div class="flex-1">
+            <label class="block text-xs font-bold text-gray-400 mb-2 uppercase">Tanggal</label>
+            <input type="date" id="ev-date" class="w-full bg-black/50 border border-gray-700 text-white p-3 rounded-xl focus:border-blue-500 outline-none [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert">
+          </div>
+          <div class="flex-1">
+            <label class="block text-xs font-bold text-gray-400 mb-2 uppercase">Kategori</label>
+            <select id="ev-category" class="w-full bg-black/50 border border-gray-700 text-white p-3 rounded-xl focus:border-blue-500 outline-none">
+              <option value="custom">Custom (Biru)</option>
+              <option value="festival">Festival (Ungu)</option>
+              <option value="liburan">Liburan (Hijau)</option>
+            </select>
+          </div>
+        </div>
+        
+        <div>
+          <label class="block text-xs font-bold text-blue-400 mb-2 uppercase flex items-center gap-2"><i data-lucide="bell-ring" class="w-4 h-4"></i> Auto-Reminder (Notifikasi)</label>
+          <select id="ev-reminder" class="w-full bg-blue-900/20 border border-blue-500/30 text-blue-100 p-3 rounded-xl focus:border-blue-500 outline-none font-bold">
+            <option value="0">Jangan ingatkan</option>
+            <option value="1">Ingatkan H-1</option>
+            <option value="3">Ingatkan H-3</option>
+            <option value="7">Ingatkan H-7</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-400 mb-2 uppercase">Deskripsi / Link</label>
+          <textarea id="ev-desc" rows="2" class="w-full bg-black/50 border border-gray-700 text-white p-3 rounded-xl focus:border-blue-500 outline-none" placeholder="Catatan atau Link tiket..."></textarea>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-400 mb-2 uppercase">Poster / Gambar (Opsional)</label>
+          <div class="file-input-wrapper">
+            <input type="file" id="ev-image" accept="image/*" onchange="previewEvImage(event)">
+            <label class="file-input-label flex items-center justify-center gap-2" for="ev-image"><i data-lucide="image-plus" class="w-5 h-5"></i> Pilih Gambar Lokal</label>
+          </div>
+          <img id="ev-preview-img" src="" class="mt-4 rounded-xl max-h-32 mx-auto hidden border border-white/10 shadow-lg object-cover">
+        </div>
+
+        <div class="flex gap-3 mt-6 pt-4 border-t border-white/10">
+          <button id="btn-ev-delete" onclick="deleteEvent()" class="hidden bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white px-5 py-3 rounded-xl font-bold transition"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+          <button onclick="saveEventData()" class="flex-1 bg-gradient-to-r from-blue-600 to-violet-600 text-white py-3 rounded-xl font-black text-lg transition hover:scale-[1.02] shadow-[0_0_15px_rgba(59,130,246,0.4)]">SIMPAN EVENT</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EVENT REMINDER POPUP (H-X) -->
+  <div id="reminder-popup" class="overlay-window hidden" style="display: none;">
+    <div class="overlay-backdrop" onclick="closeReminderPopup()"></div>
+    <div class="bg-[#111827] border-2 border-blue-500/50 rounded-[32px] overflow-hidden w-[90%] max-w-sm shadow-[0_0_50px_rgba(59,130,246,0.3)] relative flex flex-col z-[999999]">
+      <div class="bg-gradient-to-r from-blue-600 to-violet-600 p-4 text-center">
+        <h2 class="text-xl font-black text-white flex items-center justify-center gap-2 animate-pulse"><i data-lucide="calendar-star" class="w-6 h-6"></i> PENGINGAT EVENT!</h2>
+      </div>
+      <img id="rmd-img" src="" class="w-full aspect-video object-cover bg-black hidden">
+      <div class="p-6 text-center">
+        <div id="rmd-days" class="inline-block bg-blue-500/20 text-blue-400 px-4 py-1 rounded-full text-xs font-black tracking-widest mb-3 border border-blue-500/50">H-3 MENUJU HARI H</div>
+        <h3 id="rmd-title" class="text-2xl font-black text-white mb-2">Nama Event</h3>
+        <p id="rmd-desc" class="text-gray-400 text-sm font-medium mb-6 line-clamp-3">Deskripsi event...</p>
+        <button onclick="closeReminderPopup()" class="w-full bg-white text-black py-3 rounded-2xl font-black hover:bg-gray-200 transition active:scale-95">SIAAAAP! 🔥</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== MODAL EXPORT PDF ========== -->
+  <div id="modal-export" class="overlay-window hidden" style="display: none;">
+    <div class="overlay-backdrop" onclick="closeBackupModal()"></div>
+    <div class="bg-[#0f1117] p-8 rounded-[32px] border border-gray-700 w-full max-w-sm shadow-[0_0_50px_rgba(0,0,0,0.8)] z-[999999]">
+      <h3 class="text-2xl font-black text-white mb-2 flex items-center gap-3"><i data-lucide="printer" class="w-6 h-6 text-blue-400"></i> Export Logs</h3>
+      <p class="text-sm text-gray-400 mb-6 font-medium">Download catatan jurnal (termasuk foto) ke PDF.</p>
+      <div class="space-y-5">
+        <div>
+          <label class="block text-xs font-extrabold text-gray-500 mb-2 tracking-widest">START DATE</label>
+          <input type="date" id="export-start" class="w-full bg-black/50 border border-gray-700 text-white p-3.5 rounded-2xl font-bold [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-extrabold text-gray-500 mb-2 tracking-widest">END DATE</label>
+          <input type="date" id="export-end" class="w-full bg-black/50 border border-gray-700 text-white p-3.5 rounded-2xl font-bold [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div class="flex gap-3 mt-8">
+          <button onclick="closeBackupModal()" class="flex-1 bg-gray-800 text-white py-3.5 rounded-2xl hover:bg-gray-700 transition font-bold">Batal</button>
+          <button onclick="generatePDF()" class="flex-1 bg-gradient-to-r from-blue-600 to-violet-600 text-white py-3.5 rounded-2xl hover:opacity-90 transition font-black shadow-[0_0_15px_rgba(59,130,246,0.4)]">Download</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
