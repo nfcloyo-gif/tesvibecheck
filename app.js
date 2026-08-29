@@ -1,5 +1,5 @@
 // ==============================================================
-// VIBECHECK ENGINE - LITE VERSION (No Video Alarm)
+// VIBECHECK ENGINE - LITE VERSION (No Video Alarm, Fixed Calendar)
 // ==============================================================
 
 if ('serviceWorker' in navigator) {
@@ -192,8 +192,9 @@ async function saveNewTask() {
   document.getElementById('t-title').value = ''; renderTasks();
 }
 
+
 // ==========================================
-// MESIN 2: KALENDER & EVENT BANNER
+// MESIN 2: KALENDER & EVENT BANNER (FIXED)
 // ==========================================
 async function renderDailyBanner(dateStr) {
   let bannerHTML = '';
@@ -239,20 +240,35 @@ async function renderDailyBanner(dateStr) {
 }
 
 async function renderCalendar() {
+  const gridEl = document.getElementById('calendar-grid');
+  const monthYearEl = document.getElementById('cal-month-year');
+  
+  if (!gridEl || !monthYearEl) return;
+
   const year = calViewDate.getFullYear();
   const month = calViewDate.getMonth();
   const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-  document.getElementById('cal-month-year').innerText = `${monthNames[month]} ${year}`;
+  
+  monthYearEl.innerText = `${monthNames[month]} ${year}`;
 
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const todayStr = getLocalISODate(new Date());
 
-  const allTasks = await dbAct.getAll('tasks');
-  const allEvents = await dbAct.getAll('events');
+  let allTasks = [];
+  let allEvents = [];
+  try {
+    allTasks = await dbAct.getAll('tasks') || [];
+    allEvents = await dbAct.getAll('events') || [];
+  } catch (err) {
+    console.error("Gagal membaca database kalender:", err);
+  }
 
   let calHTML = '';
-  for (let i = 0; i < firstDay; i++) { calHTML += `<div class="day-cell other-month"></div>`; }
+
+  for (let i = 0; i < firstDay; i++) { 
+    calHTML += `<div class="day-cell other-month"></div>`; 
+  }
 
   for (let i = 1; i <= daysInMonth; i++) {
     const loopDate = new Date(year, month, i);
@@ -261,18 +277,22 @@ async function renderCalendar() {
     
     const dayTasks = allTasks.filter(t => t.date === dateStr);
     let dotsHTML = '';
-    if(dayTasks.length > 0) {
+    if (dayTasks.length > 0) {
       const maxDots = Math.min(dayTasks.length, 5); 
-      for(let d=0; d<maxDots; d++) dotsHTML += `<div class="quest-dot"></div>`;
+      for (let d = 0; d < maxDots; d++) {
+        dotsHTML += `<div class="quest-dot"></div>`;
+      }
     }
 
     let badgesHTML = '';
     const holiday = liburNasional[dateStr];
-    if (holiday) badgesHTML += `<div class="event-badge bg-red-600 text-white font-black truncate border border-red-400" title="${holiday}">${holiday}</div>`;
+    if (holiday) {
+      badgesHTML += `<div class="event-badge bg-red-600 text-white font-black truncate border border-red-400" title="${holiday}">${holiday}</div>`;
+    }
 
     const dayEvents = allEvents.filter(e => e.date === dateStr);
     dayEvents.forEach(e => {
-      badgesHTML += `<div class="event-badge ev-${e.category}" onclick="editEventObj('${e.id}'); event.stopPropagation();">${e.title}</div>`;
+      badgesHTML += `<div class="event-badge ev-${e.category || 'custom'}" onclick="editEventObj('${e.id}'); event.stopPropagation();">${e.title}</div>`;
     });
 
     calHTML += `
@@ -282,21 +302,33 @@ async function renderCalendar() {
         <div class="event-badges">${badgesHTML}</div>
       </div>`;
   }
-  document.getElementById('calendar-grid').innerHTML = calHTML;
+
+  gridEl.innerHTML = calHTML;
+  if (window.lucide) lucide.createIcons();
 }
 
 function openCalendarModal() {
   const modal = document.getElementById('calendar-overlay');
-  modal.classList.remove('hidden'); modal.style.display = 'block'; document.body.style.overflow = 'hidden';
-  calViewDate = new Date(currentDate); renderCalendar();
+  if (!modal) return;
+  modal.classList.remove('hidden'); 
+  modal.style.display = 'block'; 
+  document.body.style.overflow = 'hidden';
+  calViewDate = new Date(currentDate); 
+  renderCalendar();
 }
+
 function closeCalendarModal() {
   const modal = document.getElementById('calendar-overlay');
-  modal.classList.add('hidden'); modal.style.display = 'none'; document.body.style.overflow = 'auto';
+  if (!modal) return;
+  modal.classList.add('hidden'); 
+  modal.style.display = 'none'; 
+  document.body.style.overflow = 'auto';
 }
+
 function calPrevMonth() { calViewDate.setMonth(calViewDate.getMonth() - 1); renderCalendar(); }
 function calNextMonth() { calViewDate.setMonth(calViewDate.getMonth() + 1); renderCalendar(); }
 function selectDateFromCalendar(dateStr) { currentDate = new Date(dateStr); updateDateUI(); renderTasks(); loadJournal(); closeCalendarModal(); }
+
 
 // EVENT CRUD
 function openAddEventModal() {
@@ -312,7 +344,11 @@ function openAddEventModal() {
   const modal = document.getElementById('modal-event-form');
   modal.classList.remove('hidden'); modal.style.display = 'flex'; 
 }
-function closeEventModal() { document.getElementById('modal-event-form').classList.add('hidden'); document.getElementById('modal-event-form').style.display = 'none'; }
+function closeEventModal() { 
+  const modal = document.getElementById('modal-event-form');
+  modal.classList.add('hidden'); 
+  modal.style.display = 'none'; 
+}
 async function previewEvImage(e) {
   const file = e.target.files[0];
   if(file) {
@@ -378,7 +414,11 @@ async function checkEventReminders() {
     }
   }
 }
-function closeReminderPopup() { document.getElementById('reminder-popup').classList.add('hidden'); document.getElementById('reminder-popup').style.display = 'none'; }
+function closeReminderPopup() { 
+  const popup = document.getElementById('reminder-popup');
+  popup.classList.add('hidden'); 
+  popup.style.display = 'none'; 
+}
 
 
 // ==========================================
@@ -523,7 +563,10 @@ function openBackupModal() {
   d.setDate(d.getDate() - 7); document.getElementById('export-start').value = getLocalISODate(d);
   document.getElementById('modal-export').classList.remove('hidden'); document.getElementById('modal-export').style.display = 'flex';
 }
-function closeBackupModal() { document.getElementById('modal-export').classList.add('hidden'); document.getElementById('modal-export').style.display = 'none'; }
+function closeBackupModal() { 
+  document.getElementById('modal-export').classList.add('hidden'); 
+  document.getElementById('modal-export').style.display = 'none'; 
+}
 function blobToBase64(blob) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(blob); }); }
 async function generatePDF() {
   const start = document.getElementById('export-start').value, end = document.getElementById('export-end').value;
@@ -564,5 +607,5 @@ window.onload = async () => {
   reminderEngineInterval = setInterval(checkEventReminders, 60000); // Mengecek pengingat kalender (H-X) setiap 1 menit
 
   if(window.lucide) lucide.createIcons(); 
-  console.log("🔥 VibeCheck LITE v1.0 (No Alarm Engine) Siap!");
+  console.log("🔥 VibeCheck LITE v1.0 (No Alarm Engine, Kalender Siap!)");
 };
